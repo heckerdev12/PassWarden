@@ -35,8 +35,10 @@ import '@ionic/vue/css/palettes/dark.system.css';
 import './theme/variables.css';
 
 const app = createApp(App)
-  .use(IonicVue)
-  .use(router);
+  .use(router)
+  .use(IonicVue, {
+    mode: 'ios' // 👈 Forces iOS styling globally
+  });
 
 router.isReady().then(() => {
   app.mount('#app');

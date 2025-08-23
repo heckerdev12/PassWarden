@@ -19,7 +19,7 @@
       </ion-header>
 
       <!-- Search Modal -->
-      <ion-modal :is-open="isSearchOpen" @did-dismiss="closeSearch" :presenting-element="$parent.$refs.page">
+      <ion-modal :is-open="isSearchOpen" @did-dismiss="closeSearch" presenting-element="$parent.$refs.page">
         <ion-header :translucent="true">
           <ion-toolbar>
             <ion-title>Search Passwords</ion-title>
@@ -41,7 +41,7 @@
           
           <div v-if="searchResults.length > 0" class="search-results">
             <ion-list :inset="true" class="search-list">
-              <ion-item v-for="result in searchResults" :key="result.id" button lines="full">
+              <ion-item v-for="result in searchResults" key="result.id" button lines="full">
                 <ion-avatar slot="start">
                   <div class="app-icon" :style="{ backgroundColor: getIconColor(result.name) }">
                     {{ result.name.charAt(0).toUpperCase() }}
@@ -148,7 +148,7 @@
         </ion-card>
 
         <!-- Password Generator Modal -->
-        <ion-modal :is-open="isGeneratorOpen" @did-dismiss="closeGenerator" :presenting-element="$parent.$refs.page">
+        <ion-modal :is-open="isGeneratorOpen" @did-dismiss="closeGenerator" presenting-element="$parent.$refs.page">
           <ion-header :translucent="true">
             <ion-toolbar>
               <ion-title>Password Generator</ion-title>
@@ -197,19 +197,21 @@
                   <ion-card-title>Customize Password</ion-card-title>
                 </ion-card-header>
                 <ion-card-content>
-                  <ion-list lines="none" >
-                    <ion-item>
-                      <ion-label>
-                        <h3>Password Length</h3>
-                      </ion-label>
+                  <ion-list lines="none" class="password-length-list">
+                    <ion-item class="password-length-item">
                       <ion-range 
                         v-model="passwordLength" 
+                        label="password Length"
                         :min="8" 
                         :max="50" 
                         :pin="true"
                         @ion-change="generateNewPassword"
                         class="custom-length-range"
-                      ></ion-range>
+                        :ticks="true"
+                        :snaps="true"
+                        :step="1"
+                      >
+                      </ion-range>
                     </ion-item>
 
                     <ion-item>
@@ -335,15 +337,15 @@ const closeSearch = () => {
 };
 
 const handleSearch = (event: CustomEvent) => {
-  const query = event.detail.value.toLowerCase();
-  if (query.trim() === '') {
+  const query = (event.detail.value?.toLowerCase() || '').trim();
+  if (!query) {
     searchResults.value = [];
     return;
   }
   
   searchResults.value = mockPasswords.filter(password =>
-    password.name.toLowerCase().includes(query) ||
-    password.username.toLowerCase().includes(query)
+    (password.name?.toLowerCase() || '').includes(query) ||
+    (password.username?.toLowerCase() || '').includes(query)
   );
 };
 
@@ -399,10 +401,8 @@ onMounted(() => {
   // Initialize any data loading here
 });
 </script>
-<!-- Add this CSS to your existing styles -->
-<style scoped>
-/* Your existing styles... */
 
+<style scoped>
 /* Custom range styling without colors */
 .custom-length-range {
   --bar-background: #e0e0e0;
@@ -440,7 +440,7 @@ onMounted(() => {
   color: var(--pin-color);
   border-radius: 50%;
   transform: scale(1);
-  top: -32px;
+  top: -22px;
   min-width: 28px;
   height: 28px;
   font-weight: 600;
@@ -797,7 +797,7 @@ ion-card {
 ion-item {
   --background: transparent;
   --inner-padding-end: 0;
-  --padding-start: 0;
+  --padding-start: 15px;
 }
 
 ion-button {

@@ -19,7 +19,7 @@
       </ion-header>
 
       <!-- Search Modal -->
-      <ion-modal :is-open="isSearchOpen" @did-dismiss="closeSearch" presenting-element="$parent.$refs.page">
+      <ion-modal :is-open="isSearchOpen" @did-dismiss="closeSearch">
         <ion-header :translucent="true">
           <ion-toolbar>
             <ion-title>Search Passwords</ion-title>
@@ -41,7 +41,7 @@
           
           <div v-if="searchResults.length > 0" class="search-results">
             <ion-list :inset="true" class="search-list">
-              <ion-item v-for="result in searchResults" key="result.id" button lines="full">
+              <ion-item v-for="result in searchResults" :key="result.id" button lines="full">
                 <ion-avatar slot="start">
                   <div class="app-icon" :style="{ backgroundColor: getIconColor(result.name) }">
                     {{ result.name.charAt(0).toUpperCase() }}
@@ -148,7 +148,7 @@
         </ion-card>
 
         <!-- Password Generator Modal -->
-        <ion-modal :is-open="isGeneratorOpen" @did-dismiss="closeGenerator" presenting-element="$parent.$refs.page">
+        <ion-modal :is-open="isGeneratorOpen" @did-dismiss="closeGenerator">
           <ion-header :translucent="true">
             <ion-toolbar>
               <ion-title>Password Generator</ion-title>
@@ -394,6 +394,10 @@ const copyPassword = async () => {
     console.log('Password copied to clipboard');
   } catch (error) {
     console.error('Failed to copy password:', error);
+    // Fallback for web/platforms that don't support Capacitor
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(generatedPassword.value);
+    }
   }
 };
 
@@ -402,64 +406,6 @@ onMounted(() => {
 });
 </script>
 
-<style scoped>
-/* Custom range styling without colors */
-.custom-length-range {
-  --bar-background: #e0e0e0;
-  --bar-background-active: var(--ion-color-primary);
-  --bar-height: 6px;
-  --knob-background: var(--ion-color-primary);
-  --knob-size: 20px;
-  --pin-background: var(--ion-color-primary);
-  --pin-color: white;
-}
-
-.custom-length-range::part(bar) {
-  background: var(--bar-background);
-  height: var(--bar-height);
-  border-radius: 3px;
-}
-
-.custom-length-range::part(bar-active) {
-  background: var(--bar-background-active);
-}
-
-.custom-length-range::part(knob) {
-  background: var(--knob-background);
-  width: var(--knob-size);
-  height: var(--knob-size);
-  border: 2px solid white;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-}
-
-.custom-length-range::part(pin) {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--pin-background);
-  color: var(--pin-color);
-  border-radius: 50%;
-  transform: scale(1);
-  top: -22px;
-  min-width: 28px;
-  height: 28px;
-  font-weight: 600;
-  font-size: 12px;
-  transition: transform 120ms ease, background 120ms ease;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-}
-
-.custom-length-range::part(pin)::before {
-  content: none;
-}
-
-/* Dark mode adjustments */
-@media (prefers-color-scheme: dark) {
-  .custom-length-range {
-    --bar-background: var(--ion-color-step-200);
-  }
-}
-</style>
 <style scoped>
 .home-content {
   padding-bottom: 100px;
@@ -508,7 +454,6 @@ onMounted(() => {
 .stats-card {
   margin-bottom: 24px;
   border-radius: 16px;
-  background: var(--ion-color-step-50);
 }
 
 .stats-grid {
@@ -565,7 +510,6 @@ onMounted(() => {
   margin-bottom: 16px;
   border-radius: 16px;
   transition: all 0.3s ease;
-  background: var(--ion-color-step-50);
 }
 
 .action-card:hover {
@@ -619,7 +563,6 @@ onMounted(() => {
 /* Recent Activity Card */
 .recent-card {
   border-radius: 16px;
-  background: var(--ion-color-step-50);
 }
 
 .activity-item {
@@ -711,7 +654,6 @@ onMounted(() => {
 .password-display-card {
   margin-bottom: 20px;
   border-radius: 16px;
-  background: var(--ion-color-step-50);
 }
 
 .password-strength {
@@ -763,13 +705,7 @@ onMounted(() => {
 
 .options-card {
   margin-bottom: 20px;
-  margin-left: 5px;
-  margin-right: 5px;
   border-radius: 16px;
-  background: var(--ion-color-step-50);
-}
-.options-content {
-  padding: 40px;
 }
 
 .option-label h3 {
@@ -788,34 +724,14 @@ onMounted(() => {
   padding: 24px 0;
 }
 
-/* iOS-style improvements */
-ion-card {
-  --background: var(--ion-color-step-50);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-}
-
-ion-item {
-  --background: transparent;
-  --inner-padding-end: 0;
-  --padding-start: 15px;
-}
-
-ion-button {
-  --border-radius: 12px;
-}
-
-ion-modal {
-  --border-radius: 16px;
-}
-
-/* Dark theme specific adjustments */
-@media (prefers-color-scheme: dark) {
-  .welcome-card {
-    background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
-  }
-  
-  ion-card {
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-  }
+/* Custom range styling */
+.custom-length-range {
+  --bar-background: #e0e0e0;
+  --bar-background-active: var(--ion-color-primary);
+  --bar-height: 6px;
+  --knob-background: var(--ion-color-primary);
+  --knob-size: 20px;
+  --pin-background: var(--ion-color-primary);
+  --pin-color: white;
 }
 </style>

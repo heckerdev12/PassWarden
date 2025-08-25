@@ -33,35 +33,185 @@
         <ion-content :fullscreen="true" class="ion-padding">
           <ion-searchbar 
             v-model="searchQuery" 
-            placeholder="Search by app or website name"
+            placeholder="Search by app, website, username or email"
             @ion-input="handleSearch"
             show-clear-button="focus"
             :debounce="300"
           ></ion-searchbar>
           
+          <!-- Search Results -->
           <div v-if="searchResults.length > 0" class="search-results">
             <ion-list :inset="true" class="search-list">
-              <ion-item v-for="result in searchResults" :key="result.id" button lines="full">
+              <ion-item 
+                v-for="result in searchResults" 
+                :key="result.id" 
+                button 
+                lines="full"
+                @click="openPasswordDetails(result)"
+              >
                 <ion-avatar slot="start">
                   <div class="app-icon" :style="{ backgroundColor: getIconColor(result.name) }">
                     {{ result.name.charAt(0).toUpperCase() }}
                   </div>
                 </ion-avatar>
                 <ion-label>
-                  <h2>{{ result?.name || 'Unnamed' }}</h2>
-                  <p>{{ result?.username || 'No username' }}</p>
+                  <h2>{{ result.name }}</h2>
+                  <p>{{ result.username || result.email || 'No username' }}</p>
+                  <div class="result-meta">
+                    <ion-chip :color="getCategoryColor(result.category)" size="small">
+                      {{ result.category }}
+                    </ion-chip>
+                    <span class="last-updated">{{ formatDate(result.updatedAt) }}</span>
+                  </div>
+                </ion-label>
+                <ion-button 
+                  fill="clear" 
+                  @click.stop="copyPasswordQuick(result.password)"
+                  class="quick-copy"
+                >
+                  <ion-icon :icon="copyOutline"></ion-icon>
+                </ion-button>
+              </ion-item>
+            </ion-list>
+          </div>
+          
+          <!-- No Search Results -->
+          <div v-else-if="searchQuery && searchResults.length === 0" class="no-results">
+            <ion-icon :icon="searchOutline" class="no-results-icon"></ion-icon>
+            <ion-text color="medium">
+              <h3>No results found</h3>
+              <p>Try searching for a different app, website, username, or email</p>
+            </ion-text>
+          </div>
+
+          <!-- Search Suggestions -->
+          <div v-else-if="!searchQuery && savedPasswords.length > 0" class="search-suggestions">
+            <h3>Recent Passwords</h3>
+            <ion-list :inset="true">
+              <ion-item 
+                v-for="password in recentPasswords" 
+                :key="password.id" 
+                button 
+                lines="full"
+                @click="openPasswordDetails(password)"
+              >
+                <ion-avatar slot="start">
+                  <div class="app-icon" :style="{ backgroundColor: getIconColor(password.name) }">
+                    {{ password.name.charAt(0).toUpperCase() }}
+                  </div>
+                </ion-avatar>
+                <ion-label>
+                  <h2>{{ password.name }}</h2>
+                  <p>{{ password.username || password.email || 'No username' }}</p>
                 </ion-label>
                 <ion-icon :icon="chevronForwardOutline" slot="end" color="medium"></ion-icon>
               </ion-item>
             </ion-list>
           </div>
-          
-          <div v-else-if="searchQuery && searchResults.length === 0" class="no-results">
-            <ion-icon :icon="searchOutline" class="no-results-icon"></ion-icon>
-            <ion-text color="medium">
-              <h3>No results found</h3>
-              <p>Try searching for a different app or website name</p>
-            </ion-text>
+
+          <!-- Empty State for Search -->
+          <div v-else-if="!searchQuery && savedPasswords.length === 0" class="search-empty">
+            <ion-icon :icon="lockClosedOutline" class="empty-icon"></ion-icon>
+            <h3>No passwords saved yet</h3>
+            <p>Add passwords to your vault to search them here</p>
+          </div>
+        </ion-content>
+      </ion-modal>
+
+      <!-- Password Details Modal -->
+      <ion-modal :is-open="isDetailsModalOpen" @did-dismiss="closeDetailsModal">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>{{ selectedPassword?.name }}</ion-title>
+            <ion-buttons slot="end">
+              <ion-button @click="closeDetailsModal" fill="clear">
+                <ion-icon :icon="closeOutline"></ion-icon>
+              </ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content class="ion-padding">
+          <div v-if="selectedPassword" class="details-content">
+            <div class="details-header">
+              <div class="details-avatar">
+                <div class="app-icon large" :style="{ backgroundColor: getIconColor(selectedPassword.name) }">
+                  {{ selectedPassword.name.charAt(0).toUpperCase() }}
+                </div>
+              </div>
+              <h2>{{ selectedPassword.name }}</h2>
+              <ion-chip :color="getCategoryColor(selectedPassword.category)">
+                {{ selectedPassword.category }}
+              </ion-chip>
+            </div>
+
+            <ion-card>
+              <ion-card-content>
+                <ion-list lines="none">
+                  <ion-item v-if="selectedPassword.username">
+                    <ion-label>
+                      <h3>Username</h3>
+                      <p>{{ selectedPassword.username }}</p>
+                    </ion-label>
+                    <ion-button 
+                      fill="clear" 
+                      @click="copyText(selectedPassword.username)"
+                      slot="end"
+                    >
+                      <ion-icon :icon="copyOutline"></ion-icon>
+                    </ion-button>
+                  </ion-item>
+
+                  <ion-item v-if="selectedPassword.email">
+                    <ion-label>
+                      <h3>Email</h3>
+                      <p>{{ selectedPassword.email }}</p>
+                    </ion-label>
+                    <ion-button 
+                      fill="clear" 
+                      @click="copyText(selectedPassword.email)"
+                      slot="end"
+                    >
+                      <ion-icon :icon="copyOutline"></ion-icon>
+                    </ion-button>
+                  </ion-item>
+
+                  <ion-item>
+                    <ion-label>
+                      <h3>Password</h3>
+                      <p class="password-display">
+                        {{ showDetailsPassword ? selectedPassword.password : '•'.repeat(selectedPassword.password.length) }}
+                      </p>
+                    </ion-label>
+                    <ion-button 
+                      fill="clear" 
+                      @click="toggleDetailsPassword"
+                      slot="end"
+                    >
+                      <ion-icon :icon="showDetailsPassword ? eyeOffOutline : eyeOutline"></ion-icon>
+                    </ion-button>
+                    <ion-button 
+                      fill="clear" 
+                      @click="copyText(selectedPassword.password)"
+                      slot="end"
+                    >
+                      <ion-icon :icon="copyOutline"></ion-icon>
+                    </ion-button>
+                  </ion-item>
+
+                  <ion-item v-if="selectedPassword.notes">
+                    <ion-label>
+                      <h3>Notes</h3>
+                      <p>{{ selectedPassword.notes }}</p>
+                    </ion-label>
+                  </ion-item>
+                </ion-list>
+              </ion-card-content>
+            </ion-card>
+
+            <div class="details-meta">
+              <p>Created: {{ formatDate(selectedPassword.createdAt) }}</p>
+              <p>Last updated: {{ formatDate(selectedPassword.updatedAt) }}</p>
+            </div>
           </div>
         </ion-content>
       </ion-modal>
@@ -94,6 +244,13 @@
                 </div>
               </div>
               <div class="stat-divider"></div>
+              <div class="stat-item secondary">
+                <ion-icon :icon="trendingUpOutline" class="stat-icon"></ion-icon>
+                <div class="stat-info">
+                  <h2>{{ weeklyAdditions }}</h2>
+                  <p>Added This Week</p>
+                </div>
+              </div>
             </div>
           </ion-card-content>
         </ion-card>
@@ -105,43 +262,55 @@
           </ion-text>
         </div>
 
-        <ion-card button @click="generatePassword" class="action-card generator-card">
-          <ion-card-content>
-            <div class="action-content">
-              <div class="action-icon-container">
-                <ion-icon :icon="keyOutline" class="action-icon"></ion-icon>
+        <div class="actions-grid">
+          <ion-card button @click="generatePassword" class="action-card generator-card">
+            <ion-card-content>
+              <div class="action-content">
+                <div class="action-icon-container">
+                  <ion-icon :icon="keyOutline" class="action-icon"></ion-icon>
+                </div>
+                <div class="action-text">
+                  <h3>Password Generator</h3>
+                  <p>Create a secure, randomized password</p>
+                </div>
+                <ion-icon :icon="chevronForwardOutline" class="action-chevron"></ion-icon>
               </div>
-              <div class="action-text">
-                <h3>Password Generator</h3>
-                <p>Create a secure, randomized password</p>
+            </ion-card-content>
+          </ion-card>
+
+          <ion-card button @click="openSearch" class="action-card search-card">
+            <ion-card-content>
+              <div class="action-content">
+                <div class="action-icon-container search">
+                  <ion-icon :icon="searchOutline" class="action-icon"></ion-icon>
+                </div>
+                <div class="action-text">
+                  <h3>Quick Search</h3>
+                  <p>Find your passwords instantly</p>
+                </div>
+                <ion-icon :icon="chevronForwardOutline" class="action-chevron"></ion-icon>
               </div>
-              <ion-icon :icon="chevronForwardOutline" class="action-chevron"></ion-icon>
-            </div>
-          </ion-card-content>
-        </ion-card>
+            </ion-card-content>
+          </ion-card>
+        </div>
 
         <!-- Recent Activity Card -->
-        <ion-card class="recent-card">
+        <ion-card v-if="recentActivity.length > 0" class="recent-card">
           <ion-card-header>
             <ion-card-title>Recent Activity</ion-card-title>
           </ion-card-header>
           <ion-card-content>
-            <div class="activity-item">
+            <div 
+              v-for="activity in recentActivity" 
+              :key="activity.id"
+              class="activity-item"
+            >
               <div class="activity-icon">
-                <ion-icon :icon="addCircleOutline" color="success"></ion-icon>
+                <ion-icon :icon="activity.icon" :color="activity.color"></ion-icon>
               </div>
               <div class="activity-text">
-                <p class="activity-title">Password added</p>
-                <p class="activity-subtitle">Instagram • 2 hours ago</p>
-              </div>
-            </div>
-            <div class="activity-item">
-              <div class="activity-icon">
-                <ion-icon :icon="refreshCircleOutline" color="primary"></ion-icon>
-              </div>
-              <div class="activity-text">
-                <p class="activity-title">Password updated</p>
-                <p class="activity-subtitle">Gmail • Yesterday</p>
+                <p class="activity-title">{{ activity.title }}</p>
+                <p class="activity-subtitle">{{ activity.subtitle }}</p>
               </div>
             </div>
           </ion-card-content>
@@ -280,27 +449,59 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton,
   IonIcon, IonModal, IonSearchbar, IonList, IonItem, IonLabel, IonAvatar,
   IonText, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonTextarea,
-  IonRange, IonCheckbox
+  IonRange, IonCheckbox, IonChip
 } from '@ionic/vue';
 import {
   searchOutline, keyOutline, copyOutline, refreshOutline, closeOutline,
   chevronForwardOutline, shieldCheckmarkOutline, lockClosedOutline,
-  trendingUpOutline, addCircleOutline, refreshCircleOutline
+  trendingUpOutline, addCircleOutline, refreshCircleOutline,
+  eyeOutline, eyeOffOutline
 } from 'ionicons/icons';
 import { Clipboard } from '@capacitor/clipboard';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 
+// Interfaces
+interface Password {
+  id: string;
+  name: string;
+  username?: string;
+  email?: string;
+  password: string;
+  category: string;
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface Activity {
+  id: string;
+  title: string;
+  subtitle: string;
+  icon: string;
+  color: string;
+}
+
 // State
-const totalPasswords = ref(123);
+const savedPasswords = ref<Password[]>([]);
+const totalPasswords = computed(() => savedPasswords.value.length);
+const weeklyAdditions = computed(() => {
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  return savedPasswords.value.filter(p => new Date(p.createdAt) > weekAgo).length;
+});
+
 const isSearchOpen = ref(false);
 const isGeneratorOpen = ref(false);
+const isDetailsModalOpen = ref(false);
 const searchQuery = ref('');
-const searchResults = ref([]);
+const searchResults = ref<Password[]>([]);
+const selectedPassword = ref<Password | null>(null);
+const showDetailsPassword = ref(false);
 
 // Password Generator State
 const generatedPassword = ref('');
@@ -310,22 +511,91 @@ const includeLowercase = ref(true);
 const includeNumbers = ref(true);
 const includeSymbols = ref(true);
 
-// Mock data for search
-const mockPasswords = [
-  { id: 1, name: 'Facebook', username: 'jash@email.com' },
-  { id: 2, name: 'Gmail', username: 'jash@gmail.com' },
-  { id: 3, name: 'Instagram', username: '@jash_dev' },
-  { id: 4, name: 'Twitter', username: '@jash' },
-  { id: 5, name: 'LinkedIn', username: 'jash-dev' },
-];
-
 // Color palette for app icons
 const iconColors = [
   '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
   '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9'
 ];
 
+const categoryColors: Record<string, string> = {
+  social: 'primary',
+  work: 'secondary',
+  banking: 'success',
+  shopping: 'warning',
+  entertainment: 'tertiary',
+  other: 'medium'
+};
+
+// Computed properties
+const recentPasswords = computed(() => {
+  return savedPasswords.value
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .slice(0, 5);
+});
+
+const recentActivity = computed(() => {
+  const activities: Activity[] = [];
+  
+  // Get recent passwords (added in last 7 days)
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  
+  const recentlyAdded = savedPasswords.value
+    .filter(p => new Date(p.createdAt) > weekAgo)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 2);
+
+  // Get recently updated passwords
+  const recentlyUpdated = savedPasswords.value
+    .filter(p => {
+      const created = new Date(p.createdAt);
+      const updated = new Date(p.updatedAt);
+      return updated > weekAgo && updated.getTime() !== created.getTime();
+    })
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .slice(0, 2);
+
+  // Add activities
+  recentlyAdded.forEach(password => {
+    activities.push({
+      id: `added-${password.id}`,
+      title: 'Password added',
+      subtitle: `${password.name} • ${getRelativeTime(password.createdAt)}`,
+      icon: addCircleOutline,
+      color: 'success'
+    });
+  });
+
+  recentlyUpdated.forEach(password => {
+    activities.push({
+      id: `updated-${password.id}`,
+      title: 'Password updated',
+      subtitle: `${password.name} • ${getRelativeTime(password.updatedAt)}`,
+      icon: refreshCircleOutline,
+      color: 'primary'
+    });
+  });
+
+  return activities.slice(0, 3);
+});
+
 // Methods
+const loadFromStorage = () => {
+  try {
+    const stored = localStorage.getItem('vault-passwords');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      savedPasswords.value = parsed.map((p: any) => ({
+        ...p,
+        createdAt: new Date(p.createdAt),
+        updatedAt: new Date(p.updatedAt)
+      }));
+    }
+  } catch (error) {
+    console.error('Failed to load from storage:', error);
+  }
+};
+
 const openSearch = () => {
   isSearchOpen.value = true;
 };
@@ -338,20 +608,82 @@ const closeSearch = () => {
 
 const handleSearch = (event: CustomEvent) => {
   const query = (event.detail.value?.toLowerCase() || '').trim();
+  searchQuery.value = query;
+  
   if (!query) {
     searchResults.value = [];
     return;
   }
   
-  searchResults.value = mockPasswords.filter(password =>
-    (password.name?.toLowerCase() || '').includes(query) ||
-    (password.username?.toLowerCase() || '').includes(query)
+  searchResults.value = savedPasswords.value.filter(password =>
+    password.name.toLowerCase().includes(query) ||
+    (password.username?.toLowerCase() || '').includes(query) ||
+    (password.email?.toLowerCase() || '').includes(query) ||
+    password.category.toLowerCase().includes(query) ||
+    (password.notes?.toLowerCase() || '').includes(query)
   );
+};
+
+const openPasswordDetails = (password: Password) => {
+  selectedPassword.value = password;
+  showDetailsPassword.value = false;
+  isDetailsModalOpen.value = true;
+  closeSearch();
+};
+
+const closeDetailsModal = () => {
+  isDetailsModalOpen.value = false;
+  selectedPassword.value = null;
+};
+
+const toggleDetailsPassword = () => {
+  showDetailsPassword.value = !showDetailsPassword.value;
+};
+
+const copyPasswordQuick = async (password: string) => {
+  await copyText(password);
+  // Add haptic feedback
+  try {
+    await Haptics.impact({ style: ImpactStyle.Light });
+  } catch (error) {
+    // Haptics not supported, ignore
+  }
 };
 
 const getIconColor = (name: string) => {
   const index = name.charCodeAt(0) % iconColors.length;
   return iconColors[index];
+};
+
+const getCategoryColor = (category: string) => {
+  return categoryColors[category] || 'medium';
+};
+
+const formatDate = (date: Date) => {
+  return new Date(date).toLocaleDateString();
+};
+
+const getRelativeTime = (date: Date) => {
+  const now = new Date();
+  const diffTime = Math.abs(now.getTime() - new Date(date).getTime());
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
+  
+  if (diffDays === 0) {
+    if (diffHours === 0) {
+      return 'Just now';
+    } else if (diffHours === 1) {
+      return '1 hour ago';
+    } else {
+      return `${diffHours} hours ago`;
+    }
+  } else if (diffDays === 1) {
+    return 'Yesterday';
+  } else if (diffDays < 7) {
+    return `${diffDays} days ago`;
+  } else {
+    return formatDate(date);
+  }
 };
 
 const generatePassword = () => {
@@ -385,28 +717,33 @@ const generateNewPassword = () => {
 };
 
 const copyPassword = async () => {
+  await copyText(generatedPassword.value);
+};
+
+const copyText = async (text: string) => {
   try {
     await Clipboard.write({
-      string: generatedPassword.value
+      string: text
     });
-    
-    await Haptics.impact({ style: ImpactStyle.Light });
-    console.log('Password copied to clipboard');
+    console.log('Copied to clipboard');
   } catch (error) {
-    console.error('Failed to copy password:', error);
     // Fallback for web/platforms that don't support Capacitor
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(generatedPassword.value);
+    try {
+      await navigator.clipboard.writeText(text);
+      console.log('Copied to clipboard (fallback)');
+    } catch (fallbackError) {
+      console.error('Failed to copy:', fallbackError);
     }
   }
 };
 
 onMounted(() => {
-  // Initialize any data loading here
+  loadFromStorage();
 });
 </script>
 
 <style scoped>
+
 .home-content {
   padding-bottom: 100px;
 }
@@ -505,9 +842,16 @@ onMounted(() => {
   margin: 0;
 }
 
+/* Actions Grid */
+.actions-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
 /* Action Cards */
 .action-card {
-  margin-bottom: 16px;
   border-radius: 16px;
   transition: all 0.3s ease;
 }
@@ -531,6 +875,10 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.action-icon-container.search {
+  background: var(--ion-color-secondary);
 }
 
 .action-icon {
@@ -624,6 +972,29 @@ onMounted(() => {
   font-size: 18px;
 }
 
+.app-icon.large {
+  width: 80px;
+  height: 80px;
+  font-size: 32px;
+  border-radius: 20px;
+}
+
+.result-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.last-updated {
+  font-size: 12px;
+  color: var(--ion-color-medium);
+}
+
+.quick-copy {
+  --color: var(--ion-color-primary);
+}
+
 .no-results {
   padding: 60px 16px;
   text-align: center;
@@ -644,6 +1015,85 @@ onMounted(() => {
 .no-results p {
   font-size: 14px;
   margin: 0;
+}
+
+/* Search Suggestions */
+.search-suggestions {
+  padding: 16px 0;
+}
+
+.search-suggestions h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 16px 16px;
+  color: var(--ion-text-color);
+}
+
+.search-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 40px;
+  text-align: center;
+  min-height: 40vh;
+}
+
+.empty-icon {
+  font-size: 80px;
+  color: var(--ion-color-medium);
+  margin-bottom: 24px;
+}
+
+.search-empty h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--ion-text-color);
+  margin: 0 0 8px 0;
+}
+
+.search-empty p {
+  font-size: 16px;
+  color: var(--ion-color-medium);
+  margin: 0;
+}
+
+/* Details Modal */
+.details-content {
+  padding-bottom: 40px;
+}
+
+.details-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.details-avatar {
+  margin-bottom: 16px;
+}
+
+.details-header h2 {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0 0 12px 0;
+  color: var(--ion-text-color);
+}
+
+.password-display {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-size: 16px;
+  word-break: break-all;
+}
+
+.details-meta {
+  margin-top: 24px;
+  text-align: center;
+}
+
+.details-meta p {
+  font-size: 14px;
+  color: var(--ion-color-medium);
+  margin: 4px 0;
 }
 
 /* Generator Modal */
